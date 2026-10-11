@@ -5,6 +5,9 @@ on:
     branches: ["main"]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -19,7 +22,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
+      # Caching will be enabled once pnpm-lock.yaml is committed.
       - run: pnpm install --no-frozen-lockfile
       - run: pnpm db:generate
       - run: pnpm typecheck
