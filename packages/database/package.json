@@ -1,0 +1,28 @@
+{
+  "name": "@next-kanban/database",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "build": "prisma --config prisma7.config.ts generate",
+    "typecheck": "prisma --config prisma7.config.ts generate && tsc --noEmit",
+    "lint": "prisma validate --config prisma7.config.ts",
+    "db:generate": "prisma --config prisma7.config.ts generate",
+    "db:migrate": "prisma --config prisma7.config.ts migrate dev",
+    "db:seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
+    "dotenv": "^17.2.3",
+    "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.2",
+    "@types/pg": "^8.15.5",
+    "prisma": "^7.10.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}
