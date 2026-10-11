@@ -1,0 +1,22 @@
+{
+  "name": "next-kanban",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "typecheck": "turbo typecheck",
+    "lint": "turbo lint",
+    "db:generate": "pnpm --filter @next-kanban/database db:generate",
+    "db:migrate": "pnpm --filter @next-kanban/database db:migrate",
+    "db:seed": "pnpm --filter @next-kanban/database db:seed"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.8",
+    "typescript": "^5.9.3"
+  },
+  "packageManager": "pnpm@10.18.3",
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}
