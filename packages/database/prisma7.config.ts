@@ -1,5 +1,9 @@
-import "dotenv/config";
+import { config } from "dotenv";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "prisma/config";
+
+// Both local development and CLI commands use the repository-root .env.
+config({ path: fileURLToPath(new URL("../../.env", import.meta.url)) });
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
