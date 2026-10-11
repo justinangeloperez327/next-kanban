@@ -10,7 +10,7 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import type { BoardSnapshot, CardSnapshot } from "@next-kanban/contracts";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getSocket } from "@/lib/socket";
 
 function CardItem({ card }: { card: CardSnapshot }) {
@@ -89,6 +89,7 @@ export function KanbanBoard({ boardId }: { boardId: string }) {
     "connecting" | "online" | "offline"
   >("connecting");
   const [lastSequence, setLastSequence] = useState<string | undefined>();
+  const lastSequenceRef = useRef<string | undefined>(undefined);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
   );
@@ -109,6 +110,7 @@ export function KanbanBoard({ boardId }: { boardId: string }) {
       version: number;
       sequence: string;
     }) => {
+      lastSequenceRef.current = event.sequence;
       setLastSequence(event.sequence);
       setBoard((current) => {
         if (!current) return current;
@@ -158,12 +160,15 @@ export function KanbanBoard({ boardId }: { boardId: string }) {
       setConnection("online");
       socket.emit(
         "board:join",
-        { boardId, afterSequence: lastSequence },
+        { boardId, afterSequence: lastSequenceRef.current },
         (result) => {
           if (result.ok) {
             setBoard(result.snapshot);
             const latest = result.events.at(-1);
-            if (latest) setLastSequence(latest.sequence);
+            if (latest) {
+              lastSequenceRef.current = latest.sequence;
+              setLastSequence(latest.sequence);
+            }
           }
         },
       );
@@ -182,7 +187,7 @@ export function KanbanBoard({ boardId }: { boardId: string }) {
       socket.off("card:moved", applyRemoteMove);
       socket.disconnect();
     };
-  }, [applyRemoteMove, boardId, lastSequence]);
+  }, [applyRemoteMove, boardId]);
 
   const moveCardOptimistically = (
     cardId: string,
@@ -254,6 +259,7 @@ export function KanbanBoard({ boardId }: { boardId: string }) {
           return;
         }
 
+        lastSequenceRef.current = result.sequence;
         setLastSequence(result.sequence);
         setBoard((current) =>
           current
