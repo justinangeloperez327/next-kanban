@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@next-kanban/database";
 import { currentUser } from "@/lib/auth";
 import { WorkspaceDashboard } from "@/components/workspace-dashboard";
+import { LogoutButton } from "@/components/logout-button";
 
 export default async function Home() {
   const user = await currentUser();
@@ -22,7 +23,7 @@ export default async function Home() {
       <div className="mx-auto max-w-6xl">
         <div className="mb-8 flex items-center justify-between">
           <div><p className="text-xs tracking-widest text-blue-400">NEXT KANBAN</p><h1 className="mt-2 text-2xl font-semibold">Your workspaces</h1><p className="mt-1 text-sm text-neutral-400">Welcome, {user.name}</p></div>
-          <form action="/api/auth/logout" method="post"><button formAction={undefined} className="rounded-md border border-neutral-700 px-3 py-2 text-sm">Sign out</button></form>
+          <LogoutButton />
         </div>
         <WorkspaceDashboard workspaces={workspaces.map(w => ({ id: w.id, name: w.name, role: w.members[0]?.role ?? "MEMBER", projects: w.projects.map(p => ({ id: p.id, name: p.name, description: p.description, archived: !!p.archivedAt, boards: p.boards })) }))} />
         {legacyBoards.length > 0 && <section className="mt-10"><h2 className="mb-3 text-lg">Standalone boards</h2><div className="flex flex-wrap gap-3">{legacyBoards.map(b => <Link key={b.id} className="rounded-lg border border-neutral-800 p-4 text-sm hover:border-blue-500" href={`/boards/${b.id}`}>{b.title}</Link>)}</div></section>}
