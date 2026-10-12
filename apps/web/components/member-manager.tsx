@@ -22,7 +22,7 @@ export function MemberManager({ workspaceId, role, currentUserId }: { workspaceI
       if (i) setInvitations((await i.json()).invitations);
     } catch (e) { setError(e instanceof Error ? e.message : "Request failed"); }
   }, [workspaceId, manage]);
-  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => { void Promise.resolve().then(refresh); }, [refresh]);
   async function invite(e: FormEvent<HTMLFormElement>) {
     e.preventDefault(); setBusy(true); setError(""); setInviteUrl("");
     try {
