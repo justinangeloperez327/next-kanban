@@ -17,6 +17,7 @@ model User {
   passwordHash String?
   avatarUrl    String?
   workspaceMemberships WorkspaceMember[]
+  invitationsSent WorkspaceInvitation[] @relation("InvitationSender")
   memberships  BoardMember[]
   sessions     Session[]
   cardsCreated Card[]        @relation("CardCreator")
@@ -108,6 +109,7 @@ model Workspace {
   description String?
   members WorkspaceMember[]
   projects Project[]
+  invitations WorkspaceInvitation[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -135,4 +137,19 @@ model Project {
   updatedAt DateTime @updatedAt
   @@unique([workspaceId, slug])
   @@index([workspaceId, archivedAt])
+}
+
+model WorkspaceInvitation {
+  id String @id @default(cuid())
+  workspaceId String
+  email String
+  role WorkspaceRole @default(MEMBER)
+  tokenHash String @unique
+  expiresAt DateTime
+  createdById String
+  createdBy User @relation("InvitationSender", fields: [createdById], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  @@unique([workspaceId, email])
+  @@index([expiresAt])
 }
