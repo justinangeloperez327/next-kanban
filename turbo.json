@@ -1,9 +1,36 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "tasks": {
-    "build": { "dependsOn": ["^build"], "outputs": [".next/**", "dist/**", "generated/**"] },
-    "dev": { "cache": false, "persistent": true },
-    "typecheck": { "dependsOn": ["^build"] },
-    "lint": { "dependsOn": ["^build"] }
-  }
+    "build": {
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        ".next/**",
+        "dist/**",
+        "generated/**"
+      ]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "typecheck": {
+      "dependsOn": [
+        "^build"
+      ]
+    },
+    "lint": {
+      "dependsOn": [
+        "^build"
+      ]
+    }
+  },
+  "globalPassThroughEnv": [
+    "DATABASE_URL",
+    "SOCKET_TOKEN_SECRET",
+    "WEB_ORIGIN",
+    "PORT",
+    "NEXT_PUBLIC_REALTIME_URL"
+  ]
 }
