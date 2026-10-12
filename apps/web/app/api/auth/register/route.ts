@@ -20,6 +20,7 @@ export async function POST(request: Request) {
     user = await prisma.user.create({
       data: {
         name, email, passwordHash,
+        workspaceMemberships: { create: { role: "OWNER", workspace: { create: { name: "My Workspace", slug: crypto.randomUUID(), projects: { create: { name: "My first project", slug: crypto.randomUUID() } } } } } },
         memberships: {
           create: {
             role: "OWNER",
