@@ -1,9 +1,9 @@
 import { config } from "dotenv";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient } from "../generated/prisma/client.js";
+import { PrismaClient } from "../generated/prisma/client.ts";
 
-config({ path: fileURLToPath(new URL("../../../.env", import.meta.url)) });
+config({ path: resolve(process.cwd(), "../../.env") });
 
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
