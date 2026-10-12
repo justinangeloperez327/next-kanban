@@ -18,7 +18,8 @@
     "socket.io-client": "^4.8.1",
     "@next-kanban/auth": "workspace:*",
     "@next-kanban/database": "workspace:*",
-    "zod": "^4.1.12"
+    "zod": "^4.1.12",
+    "bcryptjs": "^3.0.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.14",
