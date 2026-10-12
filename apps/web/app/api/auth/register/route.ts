@@ -47,6 +47,14 @@ export async function POST(request: Request) {
     }
     throw error;
   }
+  // Associate the starter board with the starter project for new accounts.
+  const [project, membership] = await Promise.all([
+    prisma.project.findFirst({ where: { workspace: { members: { some: { userId: user.id } } } }, select: { id: true } }),
+    prisma.boardMember.findFirst({ where: { userId: user.id }, select: { boardId: true } }),
+  ]);
+  if (project && membership) {
+    await prisma.board.update({ where: { id: membership.boardId }, data: { projectId: project.id } });
+  }
   const session = await createSession(user.id);
   const response = NextResponse.json({ ok: true });
   response.cookies.set(SESSION_COOKIE, session.token, {
