@@ -2,28 +2,36 @@ generator client {
   provider = "prisma-client"
   output   = "../generated/prisma"
 }
-
 datasource db {
   provider = "postgresql"
 }
-
 enum BoardRole {
   OWNER
   EDITOR
   VIEWER
 }
-
 model User {
   id           String        @id @default(cuid())
   email        String        @unique
   name         String
+  passwordHash String?
   avatarUrl    String?
   memberships  BoardMember[]
+  sessions     Session[]
   cardsCreated Card[]        @relation("CardCreator")
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 }
-
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  @@index([userId])
+  @@index([expiresAt])
+}
 model Board {
   id        String        @id @default(cuid())
   title     String
@@ -35,7 +43,6 @@ model Board {
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 }
-
 model BoardMember {
   id        String    @id @default(cuid())
   boardId   String
@@ -44,11 +51,9 @@ model BoardMember {
   board     Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime  @default(now())
-
   @@unique([boardId, userId])
   @@index([userId])
 }
-
 model Column {
   id        String   @id @default(cuid())
   boardId   String
@@ -59,10 +64,8 @@ model Column {
   cards     Card[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
   @@index([boardId, position])
 }
-
 model Card {
   id          String   @id @default(cuid())
   columnId    String
@@ -76,10 +79,8 @@ model Card {
   createdBy   User?    @relation("CardCreator", fields: [createdById], references: [id], onDelete: SetNull)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-
   @@index([columnId, position])
 }
-
 model BoardEvent {
   id         BigInt   @id @default(autoincrement())
   boardId    String
@@ -88,6 +89,5 @@ model BoardEvent {
   payload    Json
   board      Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
   createdAt  DateTime @default(now())
-
   @@index([boardId, id])
 }

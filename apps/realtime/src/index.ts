@@ -10,6 +10,7 @@ import type {
   ServerToClientEvents,
 } from "@next-kanban/contracts";
 import { prisma } from "@next-kanban/database";
+import { boardRole, verifySocketToken } from "@next-kanban/auth";
 
 const port = Number(process.env.PORT ?? 4001);
 const webOrigin = process.env.WEB_ORIGIN ?? "http://localhost:3000";
@@ -32,9 +33,26 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
 });
 
 const roomForBoard = (boardId: string) => `board:${boardId}`;
+io.use(async (socket, next) => {
+  try {
+    const token = socket.handshake.auth.token;
+    if (typeof token !== "string") throw new Error("Missing token");
+    const userId = await verifySocketToken(token);
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+    if (!user) throw new Error("Unknown user");
+    socket.data.userId = userId;
+    next();
+  } catch {
+    next(new Error("Unauthorized"));
+  }
+});
 
 io.on("connection", (socket) => {
   socket.on("board:join", async ({ boardId, afterSequence }, ack) => {
+    if (!(await boardRole(boardId, socket.data.userId))) {
+      ack({ ok: false, code: "NOT_FOUND", message: "Board not found." });
+      return;
+    }
     const board = await prisma.board.findUnique({
       where: { id: boardId },
       include: {
@@ -100,6 +118,11 @@ io.on("connection", (socket) => {
   });
 
   socket.on("card:move", async (input, ack) => {
+    const role = await boardRole(input.boardId, socket.data.userId);
+    if (role !== "OWNER" && role !== "EDITOR") {
+      ack({ ok: false, code: "INVALID", message: "Permission denied." });
+      return;
+    }
     if (
       !input.boardId ||
       !input.cardId ||
@@ -115,7 +138,7 @@ io.on("connection", (socket) => {
       where: { mutationId: input.mutationId },
     });
 
-    if (previous) {
+    if (previous && previous.boardId === input.boardId) {
       const payload = previous.payload as { version?: number };
       ack({
         ok: true,
@@ -206,10 +229,12 @@ io.on("connection", (socket) => {
     ack({ ok: true, version: result.version, sequence: result.sequence });
   });
 
-  socket.on("presence:update", (input) => {
+  socket.on("presence:update", async (input) => {
+    if (!socket.rooms.has(roomForBoard(input.boardId))) return;
+    if (!(await boardRole(input.boardId, socket.data.userId))) return;
     socket.volatile
       .to(roomForBoard(input.boardId))
-      .emit("presence:updated", input);
+      .emit("presence:updated", { ...input, userId: socket.data.userId });
   });
 });
 
