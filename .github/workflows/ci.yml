@@ -21,7 +21,7 @@ jobs:
           run_install: false
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
       # Caching will be enabled once pnpm-lock.yaml is committed.
       - run: pnpm install --no-frozen-lockfile
       - run: pnpm db:generate
@@ -42,7 +42,7 @@ jobs:
           run_install: false
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
       - run: pnpm install --lockfile-only --ignore-scripts
       - name: Commit lockfile if changed
         run: |
