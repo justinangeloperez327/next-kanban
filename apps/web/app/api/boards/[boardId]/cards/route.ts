@@ -49,6 +49,7 @@ export async function POST(request: Request, { params }: Context) {
     if (!column) return null;
     const last = await tx.card.findFirst({ where: { columnId }, orderBy: { position: "desc" }, select: { position: true } });
     const card = await tx.card.create({ data: { columnId, title, description: description ?? null, position: (last?.position ?? 0) + 1000, createdById: user.id } });
+    await tx.cardActivity.create({ data: { boardId, cardId: card.id, cardTitle: card.title, actorId: user.id, action: "created", details: { columnId } } });
     await tx.board.update({ where: { id: boardId }, data: { version: { increment: 1 } } });
     return card;
   });
