@@ -46,6 +46,7 @@ export type MoveCardInput = {
   cardId: string;
   targetColumnId: string;
   position: number;
+  beforeCardId?: string;
   baseVersion: number;
   mutationId: string;
 };
