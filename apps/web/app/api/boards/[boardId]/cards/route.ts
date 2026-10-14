@@ -15,11 +15,11 @@ export async function GET(_request: Request, { params }: Context) {
   if (!user) return fail("Unauthorized", 401);
   const { boardId } = await params;
   if (!(await boardAccess(boardId, user.id))) return fail("Not found", 404);
-  const params = new URL(_request.url).searchParams;
-  const priority = params.get("priority");
-  const assigneeId = params.get("assigneeId");
-  const labelId = params.get("labelId");
-  const query = params.get("q")?.trim().slice(0,100);
+  const searchParams = new URL(_request.url).searchParams;
+  const priority = searchParams.get("priority");
+  const assigneeId = searchParams.get("assigneeId");
+  const labelId = searchParams.get("labelId");
+  const query = searchParams.get("q")?.trim().slice(0,100);
   const cards = await prisma.card.findMany({
     where: { column: { boardId }, ...(priority && ["LOW","MEDIUM","HIGH","URGENT"].includes(priority) ? {priority: priority as "LOW"|"MEDIUM"|"HIGH"|"URGENT"} : {}), ...(assigneeId ? {assigneeId}:{}),...(labelId?{labels:{some:{labelId}}}:{}),...(query?{OR:[{title:{contains:query,mode:"insensitive" as const}},{description:{contains:query,mode:"insensitive" as const}}]}:{}) },
     include: { assignee: {select:{id:true,name:true,email:true}}, labels:{include:{label:true}} },
