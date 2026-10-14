@@ -73,7 +73,12 @@ model Column {
   updatedAt DateTime @updatedAt
   @@index([boardId, position])
 }
-enum CardPriority { LOW MEDIUM HIGH URGENT }
+enum CardPriority {
+ LOW
+ MEDIUM
+ HIGH
+ URGENT
+}
 model Label {
  id String @id @default(cuid())
  boardId String
