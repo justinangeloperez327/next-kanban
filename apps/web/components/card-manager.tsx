@@ -20,6 +20,7 @@ export function CardManager({boardId,columns,canEdit}:{boardId:string;columns:Co
  const [members,setMembers]=useState<Member[]>([]);
  const [newLabel,setNewLabel]=useState("");
  const [filter,setFilter]=useState("");
+ const [priorityFilter,setPriorityFilter]=useState("");
  const [busy,setBusy]=useState(false);
  const [error,setError]=useState("");
  const refresh=useCallback(async()=>{
@@ -58,9 +59,9 @@ export function CardManager({boardId,columns,canEdit}:{boardId:string;columns:Co
     <input required maxLength={200} placeholder="Card title" aria-label="New card title" value={title} onChange={e=>setTitle(e.target.value)} className="min-w-0 flex-1 rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-xs"/>
     <button disabled={busy} className="rounded bg-blue-700 px-4 py-2 text-xs disabled:opacity-50">Create card</button>
    </form>}
-   <div className="mb-3 flex flex-wrap gap-2"><input aria-label="Filter cards" placeholder="Filter by title or description" value={filter} onChange={e=>setFilter(e.target.value)} className="min-w-0 flex-1 rounded border border-neutral-700 bg-neutral-900 p-2 text-xs"/><select aria-label="Filter priority" id="priority-filter" className="rounded border border-neutral-700 bg-neutral-900 p-2 text-xs" onChange={e=>{const value=e.target.value; if(value)setCards(current=>current);}}><option value="">All priorities</option>{["LOW","MEDIUM","HIGH","URGENT"].map(p=><option key={p}>{p}</option>)}</select></div>
+   <div className="mb-3 flex flex-wrap gap-2"><input aria-label="Filter cards" placeholder="Filter by title or description" value={filter} onChange={e=>setFilter(e.target.value)} className="min-w-0 flex-1 rounded border border-neutral-700 bg-neutral-900 p-2 text-xs"/><select aria-label="Filter priority" id="priority-filter" className="rounded border border-neutral-700 bg-neutral-900 p-2 text-xs" value={priorityFilter} onChange={e=>setPriorityFilter(e.target.value)}><option value="">All priorities</option>{["LOW","MEDIUM","HIGH","URGENT"].map(p=><option key={p}>{p}</option>)}</select></div>
    <div className="grid gap-2 md:grid-cols-3">{columns.map(col=><div key={col.id} className="rounded border border-neutral-800 p-3"><h3 className="mb-3 text-xs text-neutral-400">{col.title}</h3>
-    {cards.filter(c=>c.columnId===col.id && (!filter || `${c.title} ${c.description??""}`.toLowerCase().includes(filter.toLowerCase()))).sort((a,b)=>a.position-b.position).map(card=><button key={card.id} type="button" onClick={()=>edit(card)} className="mb-2 block w-full rounded border border-neutral-700 bg-neutral-900 p-3 text-left text-xs hover:border-neutral-500"><span className="block font-medium">{card.title}</span>{card.description&&<span className="mt-1 block truncate text-neutral-400">{card.description}</span>}<span className="mt-2 block text-neutral-500">{card.priority}{card.dueAt?` · Due ${card.dueAt.slice(0,10)}`:""}</span></button>)}
+    {cards.filter(c=>c.columnId===col.id && (!priorityFilter || c.priority===priorityFilter) && (!filter || `${c.title} ${c.description??""}`.toLowerCase().includes(filter.toLowerCase()))).sort((a,b)=>a.position-b.position).map(card=><button key={card.id} type="button" onClick={()=>edit(card)} className="mb-2 block w-full rounded border border-neutral-700 bg-neutral-900 p-3 text-left text-xs hover:border-neutral-500"><span className="block font-medium">{card.title}</span>{card.description&&<span className="mt-1 block truncate text-neutral-400">{card.description}</span>}<span className="mt-2 block text-neutral-500">{card.priority}{card.dueAt?` · Due ${card.dueAt.slice(0,10)}`:""}</span></button>)}
    </div>)}</div>
   </div>
   {selected&&<div role="dialog" aria-modal="true" aria-label="Card details" className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4">
