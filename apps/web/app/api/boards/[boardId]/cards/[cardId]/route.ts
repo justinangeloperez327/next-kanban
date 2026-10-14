@@ -38,10 +38,31 @@ export async function PATCH(req: Request, { params }: Context) {
   const count=await prisma.label.count({where:{boardId,id:{in:labelIds}}});
   if(count!==labelIds.length)return fail("Labels must belong to this board",400);
  }
- const updated=await prisma.card.updateMany({where:{id:cardId,version:baseVersion,column:{boardId}},data:{...fields,...(assigneeId===undefined?{}:{assigneeId}),...(dueAt===undefined?{}:{dueAt:dueAt===null?null:new Date(dueAt)}),version:{increment:1}}});
- if(!updated.count)return fail("Card not found or changed; refresh and retry",409);
- if(labelIds!==undefined){await prisma.cardLabel.deleteMany({where:{cardId}});if(labelIds.length)await prisma.cardLabel.createMany({data:labelIds.map(labelId=>({cardId,labelId}))});}
- const card=await prisma.card.findUnique({where:{id:cardId},include:{assignee:{select:{id:true,name:true,email:true}},labels:{include:{label:true}}}});
+ const outcome=await prisma.$transaction(async tx=>{
+  const existing=await tx.card.findFirst({where:{id:cardId,column:{boardId}},include:{labels:true}});
+  if(!existing||existing.version!==baseVersion)return null;
+  const updated=await tx.card.updateMany({where:{id:cardId,version:baseVersion,column:{boardId}},data:{...fields,...(assigneeId===undefined?{}:{assigneeId}),...(dueAt===undefined?{}:{dueAt:dueAt===null?null:new Date(dueAt)}),version:{increment:1}}});
+  if(!updated.count)return null;
+  if(labelIds!==undefined){
+   await tx.cardLabel.deleteMany({where:{cardId}});
+   if(labelIds.length)await tx.cardLabel.createMany({data:labelIds.map(labelId=>({cardId,labelId}))});
+  }
+  const changes:Record<string,unknown>={};
+  if(fields.title!==undefined&&fields.title!==existing.title)changes.title={from:existing.title,to:fields.title};
+  if(fields.description!==undefined&&fields.description!==existing.description)changes.description={changed:true};
+  if(fields.priority!==undefined&&fields.priority!==existing.priority)changes.priority={from:existing.priority,to:fields.priority};
+  if(assigneeId!==undefined&&assigneeId!==existing.assigneeId)changes.assigneeId={from:existing.assigneeId,to:assigneeId};
+  if(dueAt!==undefined&&dueAt!==(existing.dueAt?.toISOString()??null))changes.dueAt={from:existing.dueAt?.toISOString()??null,to:dueAt};
+  if(labelIds!==undefined){
+   const before=existing.labels.map(item=>item.labelId).sort();
+   const after=[...labelIds].sort();
+   if(JSON.stringify(before)!==JSON.stringify(after))changes.labels={from:before,to:after};
+  }
+  if(Object.keys(changes).length)await tx.cardActivity.create({data:{boardId,cardId,cardTitle:fields.title??existing.title,actorId:user.id,action:"updated",details:changes}});
+  return tx.card.findUnique({where:{id:cardId},include:{assignee:{select:{id:true,name:true,email:true}},labels:{include:{label:true}}}});
+ });
+ if(!outcome)return fail("Card not found or changed; refresh and retry",409);
+ const card=outcome;
  return Response.json({card});
 }
 export async function DELETE(req: Request, { params }: Context) {
@@ -52,7 +73,14 @@ export async function DELETE(req: Request, { params }: Context) {
  const url=new URL(req.url);
  const baseVersion=Number(url.searchParams.get("version"));
  if(!Number.isSafeInteger(baseVersion)||baseVersion<0||!url.searchParams.has("version"))return fail("Card version required",400);
- const deleted=await prisma.card.deleteMany({where:{id:cardId,version:baseVersion,column:{boardId}}});
- if(!deleted.count)return fail("Card not found or changed; refresh and retry",409);
+ const deleted=await prisma.$transaction(async tx=>{
+  const existing=await tx.card.findFirst({where:{id:cardId,version:baseVersion,column:{boardId}},select:{id:true,title:true}});
+  if(!existing)return false;
+  const result=await tx.card.deleteMany({where:{id:cardId,version:baseVersion,column:{boardId}}});
+  if(!result.count)return false;
+  await tx.cardActivity.create({data:{boardId,cardTitle:existing.title,actorId:user.id,action:"deleted",details:{cardId}}});
+  return true;
+ });
+ if(!deleted)return fail("Card not found or changed; refresh and retry",409);
  return Response.json({ok:true});
 }
