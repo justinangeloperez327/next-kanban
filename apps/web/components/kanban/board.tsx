@@ -242,7 +242,7 @@ export function KanbanBoard({ boardId }: { boardId: string }) {
     const siblings = targetColumn.cards.filter((item) => item.id !== card.id);
     const index = beforeCardId ? siblings.findIndex((item) => item.id === beforeCardId) : siblings.length;
     if (index < 0) return;
-    if (card.columnId === targetColumn.id && targetColumn.cards[index]?.id === card.id) return;
+    if (card.columnId === targetColumn.id && (siblings[index]?.id === card.id || (beforeCardId && targetColumn.cards.findIndex((item) => item.id === card.id) + 1 === targetColumn.cards.findIndex((item) => item.id === beforeCardId)))) return;
     const previous = index > 0 ? siblings[index - 1].position : null;
     const next = index < siblings.length ? siblings[index].position : null;
     const position = previous === null ? (next === null ? 1000 : next - 1000) : (next === null ? previous + 1000 : (previous + next) / 2);
@@ -265,6 +265,9 @@ export function KanbanBoard({ boardId }: { boardId: string }) {
       (result) => {
         if (!result.ok) {
           setBoard(previousBoard);
+          getSocket().emit("board:join", { boardId }, (refresh) => {
+            if (refresh.ok) setBoard(refresh.snapshot);
+          });
           return;
         }
 
