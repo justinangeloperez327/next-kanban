@@ -34,7 +34,7 @@ export type BoardEventEnvelope = {
 };
 
 export type MutationAck =
-  | { ok: true; version: number; sequence: string }
+  | { ok: true; version: number; sequence: string; position?: number }
   | { ok: false; code: "CONFLICT" | "NOT_FOUND" | "INVALID"; message: string };
 
 export type JoinBoardAck =
