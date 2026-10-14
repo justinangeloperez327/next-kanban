@@ -1,0 +1,46 @@
+import { prisma } from "@next-kanban/database";
+import { currentUser } from "@/lib/auth";
+import { boardAccess, canEditBoard } from "@/lib/board-access";
+import { fail } from "@/lib/workspaces";
+import { z } from "zod";
+
+type Context = { params: Promise<{ boardId: string }> };
+const createInput = z.object({
+  columnId: z.string().min(1),
+  title: z.string().trim().min(1).max(200),
+  description: z.string().trim().max(10000).nullable().optional(),
+});
+export async function GET(_request: Request, { params }: Context) {
+  const user = await currentUser();
+  if (!user) return fail("Unauthorized", 401);
+  const { boardId } = await params;
+  if (!(await boardAccess(boardId, user.id))) return fail("Not found", 404);
+  const cards = await prisma.card.findMany({
+    where: { column: { boardId } },
+    select: { id: true, columnId: true, title: true, description: true, position: true, version: true, createdAt: true, updatedAt: true },
+    orderBy: [{ column: { position: "asc" } }, { position: "asc" }],
+  });
+  return Response.json({ cards });
+}
+export async function POST(request: Request, { params }: Context) {
+  const user = await currentUser();
+  if (!user) return fail("Unauthorized", 401);
+  const { boardId } = await params;
+  const member = await boardAccess(boardId, user.id);
+  if (!member) return fail("Not found", 404);
+  if (!canEditBoard(member.role)) return fail("Forbidden", 403);
+  const parsed = createInput.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return fail("Invalid card data", 400);
+  const { columnId, title, description } = parsed.data;
+  const result = await prisma.$transaction(async tx => {
+    await tx.$queryRaw`SELECT id FROM "Board" WHERE id = ${boardId} FOR UPDATE`;
+    const column = await tx.column.findFirst({ where: { id: columnId, boardId }, select: { id: true } });
+    if (!column) return null;
+    const last = await tx.card.findFirst({ where: { columnId }, orderBy: { position: "desc" }, select: { position: true } });
+    const card = await tx.card.create({ data: { columnId, title, description: description ?? null, position: (last?.position ?? 0) + 1000, createdById: user.id } });
+    await tx.board.update({ where: { id: boardId }, data: { version: { increment: 1 } } });
+    return card;
+  });
+  if (!result) return fail("Column not found", 404);
+  return Response.json({ card: result }, { status: 201 });
+}
