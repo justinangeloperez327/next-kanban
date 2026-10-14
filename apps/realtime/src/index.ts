@@ -128,7 +128,8 @@ io.on("connection", (socket) => {
       !input.cardId ||
       !input.targetColumnId ||
       !input.mutationId ||
-      !Number.isFinite(input.position)
+      !Number.isFinite(input.position) ||
+      (input.beforeCardId !== undefined && (typeof input.beforeCardId !== "string" || input.beforeCardId === input.cardId))
     ) {
       ack({ ok: false, code: "INVALID", message: "Invalid card move." });
       return;
@@ -149,6 +150,7 @@ io.on("connection", (socket) => {
     }
 
     const result = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "Board" WHERE id = ${input.boardId} FOR UPDATE`;
       const targetColumn = await tx.column.findFirst({
         where: { id: input.targetColumnId, boardId: input.boardId },
         select: { id: true },
@@ -158,6 +160,31 @@ io.on("connection", (socket) => {
         return { kind: "not-found" as const };
       }
 
+      const current = await tx.card.findFirst({
+        where: { id: input.cardId, column: { boardId: input.boardId } },
+        select: { version: true },
+      });
+      if (!current || current.version !== input.baseVersion) return { kind: "conflict" as const };
+      const siblings = await tx.card.findMany({
+        where: { columnId: input.targetColumnId, id: { not: input.cardId } },
+        orderBy: [{ position: "asc" }, { id: "asc" }],
+        select: { id: true, position: true },
+      });
+      const index = input.beforeCardId
+        ? siblings.findIndex((item) => item.id === input.beforeCardId)
+        : siblings.length;
+      if (index < 0) return { kind: "not-found" as const };
+      const before = index ? siblings[index - 1].position : null;
+      const after = index < siblings.length ? siblings[index].position : null;
+      let position = before === null
+        ? after === null ? 1000 : after - 1000
+        : after === null ? before + 1000 : (before + after) / 2;
+      if (!Number.isFinite(position) || position === before || position === after) {
+        for (const [i, sibling] of siblings.entries()) {
+          await tx.card.update({ where: { id: sibling.id }, data: { position: (i + 1) * 1000 } });
+        }
+        position = (index + 1) * 1000 - 500;
+      }
       const updated = await tx.card.updateMany({
         where: {
           id: input.cardId,
@@ -166,7 +193,7 @@ io.on("connection", (socket) => {
         },
         data: {
           columnId: input.targetColumnId,
-          position: input.position,
+          position,
           version: { increment: 1 },
         },
       });
@@ -188,7 +215,7 @@ io.on("connection", (socket) => {
           payload: {
             cardId: input.cardId,
             targetColumnId: input.targetColumnId,
-            position: input.position,
+            position,
             version: card.version,
           },
         },
@@ -196,6 +223,7 @@ io.on("connection", (socket) => {
 
       return {
         kind: "ok" as const,
+        position,
         version: card.version,
         sequence: event.id.toString(),
       };
@@ -219,7 +247,7 @@ io.on("connection", (socket) => {
       boardId: input.boardId,
       cardId: input.cardId,
       targetColumnId: input.targetColumnId,
-      position: input.position,
+      position: result.position,
       version: result.version,
       mutationId: input.mutationId,
       sequence: result.sequence,
