@@ -140,10 +140,11 @@ io.on("connection", (socket) => {
     });
 
     if (previous && previous.boardId === input.boardId) {
-      const payload = previous.payload as { version?: number };
+      const payload = previous.payload as { version?: number; position?: number };
       ack({
         ok: true,
         version: payload.version ?? input.baseVersion + 1,
+        position: payload.position,
         sequence: previous.id.toString(),
       });
       return;
@@ -254,7 +255,7 @@ io.on("connection", (socket) => {
     };
 
     socket.to(roomForBoard(input.boardId)).emit("card:moved", event);
-    ack({ ok: true, version: result.version, sequence: result.sequence });
+    ack({ ok: true, version: result.version, position: result.position, sequence: result.sequence });
   });
 
   socket.on("presence:update", async (input) => {
