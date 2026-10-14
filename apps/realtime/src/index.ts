@@ -163,7 +163,7 @@ io.on("connection", (socket) => {
 
       const current = await tx.card.findFirst({
         where: { id: input.cardId, column: { boardId: input.boardId } },
-        select: { version: true },
+        select: { version: true, title: true, columnId: true },
       });
       if (!current || current.version !== input.baseVersion) return { kind: "conflict" as const };
       const siblings = await tx.card.findMany({
@@ -208,6 +208,7 @@ io.on("connection", (socket) => {
         select: { version: true },
       });
 
+      await tx.cardActivity.create({ data: { boardId: input.boardId, cardId: input.cardId, cardTitle: current.title, actorId: socket.data.userId, action: "moved", details: { fromColumnId: current.columnId, toColumnId: input.targetColumnId, position } } });
       const event = await tx.boardEvent.create({
         data: {
           boardId: input.boardId,
