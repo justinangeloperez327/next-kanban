@@ -28,7 +28,7 @@ export function CardActivityTimeline({boardId}:{boardId:string}){
    <ol className="space-y-3">{items.map(item=><li key={item.id} className="border-l border-neutral-700 pl-3 text-xs">
     <div><span className="font-medium text-neutral-200">{item.actor?.name??"Former member"}</span> <span className="text-neutral-400">{item.action}</span> <span className="text-neutral-200">{item.cardTitle}</span></div>
     <time className="mt-1 block text-neutral-500" dateTime={item.createdAt}>{new Date(item.createdAt).toLocaleString()}</time>
-    {item.action==="updated"&&Boolean(item.details)&&typeof item.details==="object"&&<div className="mt-1 text-neutral-500">Fields changed: {Object.keys(item.details).join(", ")}</div>}
+    {item.action==="updated"&&Boolean(item.details)&&typeof item.details==="object"&&<div className="mt-1 text-neutral-500">Fields changed: {Object.keys(item.details ?? {}).join(", ")}</div>}
    </li>)}</ol>
    {nextCursor&&<button disabled={busy} type="button" onClick={()=>void load(nextCursor)} className="mt-4 rounded border border-neutral-700 px-3 py-2 text-xs disabled:opacity-50">Load older activity</button>}
   </div>
