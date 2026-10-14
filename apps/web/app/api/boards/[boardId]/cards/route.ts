@@ -20,8 +20,14 @@ export async function GET(_request: Request, { params }: Context) {
   const assigneeId = searchParams.get("assigneeId");
   const labelId = searchParams.get("labelId");
   const query = searchParams.get("q")?.trim().slice(0,100);
+  const due = searchParams.get("due");
+  const now = new Date();
+  const todayStart = new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()));
+  const tomorrow = new Date(todayStart.getTime()+86400000);
+  const weekEnd = new Date(todayStart.getTime()+7*86400000);
+  const dueWhere = due==="overdue" ? {dueAt:{lt:todayStart}} : due==="today" ? {dueAt:{gte:todayStart,lt:tomorrow}} : due==="week" ? {dueAt:{gte:todayStart,lt:weekEnd}} : due==="none" ? {dueAt:null} : {};
   const cards = await prisma.card.findMany({
-    where: { column: { boardId }, ...(priority && ["LOW","MEDIUM","HIGH","URGENT"].includes(priority) ? {priority: priority as "LOW"|"MEDIUM"|"HIGH"|"URGENT"} : {}), ...(assigneeId ? {assigneeId}:{}),...(labelId?{labels:{some:{labelId}}}:{}),...(query?{OR:[{title:{contains:query,mode:"insensitive" as const}},{description:{contains:query,mode:"insensitive" as const}}]}:{}) },
+    where: { column: { boardId },...dueWhere, ...(priority && ["LOW","MEDIUM","HIGH","URGENT"].includes(priority) ? {priority: priority as "LOW"|"MEDIUM"|"HIGH"|"URGENT"} : {}), ...(assigneeId ? {assigneeId}:{}),...(labelId?{labels:{some:{labelId}}}:{}),...(query?{OR:[{title:{contains:query,mode:"insensitive" as const}},{description:{contains:query,mode:"insensitive" as const}}]}:{}) },
     include: { assignee: {select:{id:true,name:true,email:true}}, labels:{include:{label:true}} },
     orderBy: [{ column: { position: "asc" } }, { position: "asc" }],
   });
