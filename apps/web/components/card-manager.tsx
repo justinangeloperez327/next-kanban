@@ -5,6 +5,9 @@ type Card = { id:string; columnId:string; title:string; description:string|null;
 type Column = { id:string; title:string };
 type Label={id:string;name:string;color:string};
 type Member={userId:string;user:{name:string;email:string}};
+type Filters={q:string;priority:string;assigneeId:string;labelId:string;due:string};
+type SavedView={id:string;name:string;filters:Filters};
+const emptyFilters:Filters={q:"",priority:"",assigneeId:"",labelId:"",due:""};
 export function CardManager({boardId,columns,canEdit}:{boardId:string;columns:Column[];canEdit:boolean}) {
  const [cards,setCards]=useState<Card[]>([]);
  const [columnId,setColumnId]=useState(columns[0]?.id??"");
@@ -19,18 +22,40 @@ export function CardManager({boardId,columns,canEdit}:{boardId:string;columns:Co
  const [labels,setLabels]=useState<Label[]>([]);
  const [members,setMembers]=useState<Member[]>([]);
  const [newLabel,setNewLabel]=useState("");
- const [filter,setFilter]=useState("");
- const [priorityFilter,setPriorityFilter]=useState("");
+ const [filters,setFilters]=useState<Filters>(emptyFilters);
+ const [views,setViews]=useState<SavedView[]>([]);
+ const [viewName,setViewName]=useState("");
+ const [activeView,setActiveView]=useState("");
+ const setFilter=(key:keyof Filters,value:string)=>{setFilters(prev=>({...prev,[key]:value}));setActiveView("");};
  const [busy,setBusy]=useState(false);
  const [error,setError]=useState("");
  const refresh=useCallback(async()=>{
-  const response=await fetch(`/api/boards/${boardId}/cards`,{cache:"no-store"});
+  const response=await fetch(`/api/boards/${boardId}/cards?${new URLSearchParams(Object.entries(filters).filter(([,value])=>value).map(([key,value])=>[key==="q"?"q":key,value])).toString()}`,{cache:"no-store"});
   if(!response.ok)throw new Error("Unable to load cards");
   const data=await response.json() as {cards:Card[]};
   setCards(data.cards);
   return data.cards;
- },[boardId]);
- useEffect(()=>{void Promise.resolve().then(async()=>{await refresh(); const response=await fetch(`/api/boards/${boardId}/labels`);if(response.ok){const data=await response.json();setLabels(data.labels);setMembers(data.members);}}).catch(e=>setError(e instanceof Error?e.message:"Unable to load cards"));},[refresh,boardId]);
+ },[boardId,filters]);
+ useEffect(()=>{void Promise.resolve().then(async()=>{await refresh(); const response=await fetch(`/api/boards/${boardId}/labels`);if(response.ok){const data=await response.json();setLabels(data.labels);setMembers(data.members);}const viewsResponse=await fetch(`/api/boards/${boardId}/views`);if(viewsResponse.ok){const data=await viewsResponse.json();setViews(data.views);}}).catch(e=>setError(e instanceof Error?e.message:"Unable to load cards"));},[refresh,boardId]);
+ async function saveView(){
+  if(!viewName.trim())return;
+  setBusy(true);setError("");
+  try {
+   const response=await fetch(`/api/boards/${boardId}/views`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:viewName,filters})});
+   const data=await response.json();if(!response.ok)throw new Error(data.error??"Unable to save view");
+   setViews(prev=>[...prev,data.view].sort((a,b)=>a.name.localeCompare(b.name)));
+   setActiveView(data.view.id);setViewName("");
+  }catch(e){setError(e instanceof Error?e.message:"Unable to save view");}finally{setBusy(false);}
+ }
+ async function deleteView(){
+  if(!activeView)return;
+  setBusy(true);setError("");
+  try {
+   const response=await fetch(`/api/boards/${boardId}/views/${activeView}`,{method:"DELETE"});
+   if(!response.ok)throw new Error("Unable to delete view");
+   setViews(prev=>prev.filter(view=>view.id!==activeView));setActiveView("");
+  }catch(e){setError(e instanceof Error?e.message:"Unable to delete view");}finally{setBusy(false);}
+ }
  async function request(url:string,method:string,body?:object) {
   setBusy(true);setError("");
   try {
@@ -59,9 +84,23 @@ export function CardManager({boardId,columns,canEdit}:{boardId:string;columns:Co
     <input required maxLength={200} placeholder="Card title" aria-label="New card title" value={title} onChange={e=>setTitle(e.target.value)} className="min-w-0 flex-1 rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-xs"/>
     <button disabled={busy} className="rounded bg-blue-700 px-4 py-2 text-xs disabled:opacity-50">Create card</button>
    </form>}
-   <div className="mb-3 flex flex-wrap gap-2"><input aria-label="Filter cards" placeholder="Filter by title or description" value={filter} onChange={e=>setFilter(e.target.value)} className="min-w-0 flex-1 rounded border border-neutral-700 bg-neutral-900 p-2 text-xs"/><select aria-label="Filter priority" id="priority-filter" className="rounded border border-neutral-700 bg-neutral-900 p-2 text-xs" value={priorityFilter} onChange={e=>setPriorityFilter(e.target.value)}><option value="">All priorities</option>{["LOW","MEDIUM","HIGH","URGENT"].map(p=><option key={p}>{p}</option>)}</select></div>
+   <div className="mb-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+    <input aria-label="Search cards" placeholder="Search cards" value={filters.q} onChange={e=>setFilter("q",e.target.value)} className="rounded border border-neutral-700 bg-neutral-900 p-2 text-xs"/>
+    <select aria-label="Filter priority" value={filters.priority} onChange={e=>setFilter("priority",e.target.value)} className="rounded border border-neutral-700 bg-neutral-900 p-2 text-xs"><option value="">All priorities</option>{["LOW","MEDIUM","HIGH","URGENT"].map(p=><option key={p} value={p}>{p}</option>)}</select>
+    <select aria-label="Filter assignee" value={filters.assigneeId} onChange={e=>setFilter("assigneeId",e.target.value)} className="rounded border border-neutral-700 bg-neutral-900 p-2 text-xs"><option value="">All assignees</option>{members.map(m=><option key={m.userId} value={m.userId}>{m.user.name}</option>)}</select>
+    <select aria-label="Filter label" value={filters.labelId} onChange={e=>setFilter("labelId",e.target.value)} className="rounded border border-neutral-700 bg-neutral-900 p-2 text-xs"><option value="">All labels</option>{labels.map(l=><option key={l.id} value={l.id}>{l.name}</option>)}</select>
+    <select aria-label="Filter due date" value={filters.due} onChange={e=>setFilter("due",e.target.value)} className="rounded border border-neutral-700 bg-neutral-900 p-2 text-xs"><option value="">Any due date</option><option value="overdue">Overdue</option><option value="today">Today (UTC)</option><option value="week">Next 7 days (UTC)</option><option value="none">No due date</option></select>
+   </div>
+   <div className="mb-4 flex flex-wrap items-center gap-2">
+    <select aria-label="Saved views" value={activeView} onChange={e=>{const id=e.target.value;setActiveView(id);const view=views.find(v=>v.id===id);if(view)setFilters({...emptyFilters,...view.filters});}} className="rounded border border-neutral-700 bg-neutral-900 p-2 text-xs"><option value="">Custom filters</option>{views.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}</select>
+    <input aria-label="View name" placeholder="New saved view name" maxLength={60} value={viewName} onChange={e=>setViewName(e.target.value)} className="rounded border border-neutral-700 bg-neutral-900 p-2 text-xs"/>
+    <button type="button" disabled={busy||!viewName.trim()} onClick={()=>void saveView()} className="rounded border border-neutral-700 px-3 py-2 text-xs">Save view</button>
+    <button type="button" disabled={busy||!activeView} onClick={()=>void deleteView()} className="rounded border border-neutral-700 px-3 py-2 text-xs">Delete view</button>
+    <button type="button" onClick={()=>{setFilters(emptyFilters);setActiveView("");}} className="text-xs text-neutral-400">Clear filters</button>
+    <span className="ml-auto text-xs text-neutral-500">{cards.length} matching cards</span>
+   </div>
    <div className="grid gap-2 md:grid-cols-3">{columns.map(col=><div key={col.id} className="rounded border border-neutral-800 p-3"><h3 className="mb-3 text-xs text-neutral-400">{col.title}</h3>
-    {cards.filter(c=>c.columnId===col.id && (!priorityFilter || c.priority===priorityFilter) && (!filter || `${c.title} ${c.description??""}`.toLowerCase().includes(filter.toLowerCase()))).sort((a,b)=>a.position-b.position).map(card=><button key={card.id} type="button" onClick={()=>edit(card)} className="mb-2 block w-full rounded border border-neutral-700 bg-neutral-900 p-3 text-left text-xs hover:border-neutral-500"><span className="block font-medium">{card.title}</span>{card.description&&<span className="mt-1 block truncate text-neutral-400">{card.description}</span>}<span className="mt-2 block text-neutral-500">{card.priority}{card.dueAt?` · Due ${card.dueAt.slice(0,10)}`:""}</span></button>)}
+    {cards.filter(c=>c.columnId===col.id).sort((a,b)=>a.position-b.position).map(card=><button key={card.id} type="button" onClick={()=>edit(card)} className="mb-2 block w-full rounded border border-neutral-700 bg-neutral-900 p-3 text-left text-xs hover:border-neutral-500"><span className="block font-medium">{card.title}</span>{card.description&&<span className="mt-1 block truncate text-neutral-400">{card.description}</span>}<span className="mt-2 block text-neutral-500">{card.priority}{card.dueAt?` · Due ${card.dueAt.slice(0,10)}`:""}</span></button>)}
    </div>)}</div>
   </div>
   {selected&&<div role="dialog" aria-modal="true" aria-label="Card details" className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4">
