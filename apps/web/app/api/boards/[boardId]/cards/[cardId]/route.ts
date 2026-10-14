@@ -58,7 +58,7 @@ export async function PATCH(req: Request, { params }: Context) {
    const after=[...labelIds].sort();
    if(JSON.stringify(before)!==JSON.stringify(after))changes.labels={from:before,to:after};
   }
-  if(Object.keys(changes).length)await tx.cardActivity.create({data:{boardId,cardId,cardTitle:fields.title??existing.title,actorId:user.id,action:"updated",details:changes}});
+  if(Object.keys(changes).length)await tx.cardActivity.create({data:{boardId,cardId,cardTitle:fields.title??existing.title,actorId:user.id,action:"updated",details:JSON.parse(JSON.stringify(changes))}});
   return tx.card.findUnique({where:{id:cardId},include:{assignee:{select:{id:true,name:true,email:true}},labels:{include:{label:true}}}});
  });
  if(!outcome)return fail("Card not found or changed; refresh and retry",409);
