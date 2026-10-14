@@ -22,6 +22,7 @@ model User {
   sessions     Session[]
   cardsCreated Card[]        @relation("CardCreator")
   assignedCards Card[] @relation("CardAssignee")
+  savedViews SavedCardView[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 }
@@ -47,6 +48,7 @@ model Board {
   members   BoardMember[]
   events    BoardEvent[]
   labels    Label[]
+  savedViews SavedCardView[]
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 }
@@ -180,4 +182,18 @@ model WorkspaceInvitation {
   createdAt DateTime @default(now())
   @@unique([workspaceId, email])
   @@index([expiresAt])
+}
+
+model SavedCardView {
+  id String @id @default(cuid())
+  boardId String
+  userId String
+  name String
+  filters Json
+  board Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([boardId,userId,name])
+  @@index([userId,boardId])
 }
