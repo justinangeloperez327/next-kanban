@@ -20,13 +20,16 @@ function CardItem({ card }: { card: CardSnapshot }) {
       data: { card },
     });
 
+  const { setNodeRef: setDropRef, isOver } = useDroppable({ id: "card:" + card.id });
+  const setRefs = (node: HTMLElement | null) => { setNodeRef(node); setDropRef(node); };
+
   const style = transform
     ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
     : undefined;
 
   return (
     <article
-      ref={setNodeRef}
+      ref={setRefs}
       style={style}
       {...listeners}
       {...attributes}
@@ -34,6 +37,7 @@ function CardItem({ card }: { card: CardSnapshot }) {
         "cursor-grab rounded-xl border border-white/10 bg-neutral-900 p-4 shadow-sm",
         "transition-opacity active:cursor-grabbing",
         isDragging ? "z-50 opacity-70" : "",
+        isOver ? "border-blue-500" : "",
       ].join(" ")}
     >
       <h3 className="text-sm font-medium text-neutral-100">{card.title}</h3>
@@ -231,14 +235,18 @@ export function KanbanBoard({ boardId }: { boardId: string }) {
     if (!board || !over) return;
 
     const card = cardsById.get(String(active.id));
-    const targetColumn = board.columns.find(
-      (column) => column.id === String(over.id),
-    );
-
-    if (!card || !targetColumn || card.columnId === targetColumn.id) return;
-
+    const overId = String(over.id);
+    const beforeCardId = overId.startsWith("card:") ? overId.slice(5) : undefined;
+    const targetColumn = board.columns.find((column) => column.id === overId || column.cards.some((item) => item.id === beforeCardId));
+    if (!card || !targetColumn || beforeCardId === card.id) return;
+    const siblings = targetColumn.cards.filter((item) => item.id !== card.id);
+    const index = beforeCardId ? siblings.findIndex((item) => item.id === beforeCardId) : siblings.length;
+    if (index < 0) return;
+    if (card.columnId === targetColumn.id && targetColumn.cards[index]?.id === card.id) return;
+    const previous = index > 0 ? siblings[index - 1].position : null;
+    const next = index < siblings.length ? siblings[index].position : null;
+    const position = previous === null ? (next === null ? 1000 : next - 1000) : (next === null ? previous + 1000 : (previous + next) / 2);
     const previousBoard = board;
-    const position = (targetColumn.cards.at(-1)?.position ?? 0) + 1000;
     const mutationId = crypto.randomUUID();
 
     moveCardOptimistically(card.id, targetColumn.id, position);
@@ -250,6 +258,7 @@ export function KanbanBoard({ boardId }: { boardId: string }) {
         cardId: card.id,
         targetColumnId: targetColumn.id,
         position,
+        beforeCardId,
         baseVersion: card.version,
         mutationId,
       },
@@ -269,7 +278,7 @@ export function KanbanBoard({ boardId }: { boardId: string }) {
                   ...column,
                   cards: column.cards.map((item) =>
                     item.id === card.id
-                      ? { ...item, version: result.version }
+                      ? { ...item, version: result.version, position: result.position ?? item.position }
                       : item,
                   ),
                 })),
